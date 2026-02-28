@@ -1,0 +1,1162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Satellite Telemetry Monitor</title>
+  <style>
+    /* ── Reset & base ──────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #080c12;
+      --panel:     #0e1420;
+      --card:      #131a26;
+      --card2:     #161f30;
+      --border:    #1e2d45;
+      --border2:   #243450;
+      --text:      #cdd9e5;
+      --dim:       #7a8ea6;
+      --dim2:      #506070;
+      --accent:    #4d9ef5;
+      --accent2:   #2d7dd6;
+      --green:     #3fb950;
+      --green2:    #2ea043;
+      --yellow:    #e3a525;
+      --yellow2:   #b5831e;
+      --red:       #f85149;
+      --red2:      #c93128;
+      --purple:    #bc8cff;
+      --orange:    #ffa657;
+      --teal:      #39c5aa;
+      --glow-blue: rgba(77,158,245,0.15);
+      --glow-red:  rgba(248,81,73,0.15);
+      --glow-yel:  rgba(227,165,37,0.12);
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+      font-size: 14px;
+      min-height: 100vh;
+      line-height: 1.5;
+    }
+
+    /* ── Layout ────────────────────────────────────────────────────────── */
+    .container { max-width: 1280px; margin: 0 auto; padding: 0 20px 32px; }
+
+    /* ── Top bar ────────────────────────────────────────────────────────── */
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 0 12px;
+      border-bottom: 1px solid var(--border);
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .logo { display: flex; align-items: center; gap: 12px; }
+    .logo-icon {
+      width: 38px; height: 38px;
+      background: linear-gradient(135deg, #1a3a6e, #0e2044);
+      border: 1px solid var(--border2);
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px;
+    }
+    .logo-text h1 { font-size: 18px; font-weight: 700; color: var(--text); letter-spacing: -.3px; }
+    .logo-text p  { font-size: 11px; color: var(--dim); margin-top: 1px; }
+
+    .topbar-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+    /* ── Live indicator ─────────────────────────────────────────────────── */
+    .live-badge {
+      display: flex; align-items: center; gap: 6px;
+      background: rgba(63,185,80,.08);
+      border: 1px solid rgba(63,185,80,.25);
+      border-radius: 20px;
+      padding: 4px 10px 4px 8px;
+      font-size: 11px; font-weight: 600;
+      color: var(--green);
+      letter-spacing: .4px;
+    }
+    .live-dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--green);
+      animation: livepulse 1.8s ease-in-out infinite;
+    }
+    @keyframes livepulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(.8)} }
+
+    /* ── MongoDB status badge ────────────────────────────────────────── */
+    .db-badge {
+      display: flex; align-items: center; gap: 6px;
+      border-radius: 20px;
+      padding: 4px 10px 4px 8px;
+      font-size: 11px; font-weight: 600;
+      letter-spacing: .4px;
+      cursor: default;
+      transition: background .4s, border-color .4s, color .4s;
+      background: rgba(122,142,166,.08);
+      border: 1px solid rgba(122,142,166,.25);
+      color: var(--dim);
+    }
+    .db-badge.connected {
+      background: rgba(63,185,80,.08);
+      border-color: rgba(63,185,80,.25);
+      color: var(--green);
+    }
+    .db-badge.disconnected {
+      background: rgba(248,81,73,.08);
+      border-color: rgba(248,81,73,.25);
+      color: var(--red);
+    }
+    .db-dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: currentColor;
+      flex-shrink: 0;
+    }
+    .db-badge.connected .db-dot { animation: livepulse 1.8s ease-in-out infinite; }
+
+    /* ── Satellite selector ─────────────────────────────────────────────── */
+    .sat-selector { display: flex; align-items: center; gap: 6px; }
+    .sat-selector label { font-size: 12px; color: var(--dim); white-space: nowrap; }
+    .sat-pills { display: flex; gap: 4px; }
+    .sat-pill {
+      padding: 4px 12px;
+      border-radius: 20px;
+      border: 1px solid var(--border2);
+      background: transparent;
+      color: var(--dim);
+      font-size: 12px; font-weight: 600;
+      cursor: pointer;
+      transition: all .15s;
+    }
+    .sat-pill.active {
+      background: var(--accent2);
+      border-color: var(--accent);
+      color: #fff;
+    }
+    .sat-pill:hover:not(.active) { border-color: var(--accent); color: var(--accent); }
+
+    .sat-custom {
+      display: flex; align-items: center; gap: 4px;
+    }
+    .sat-custom input {
+      width: 64px;
+      background: var(--card);
+      border: 1px solid var(--border2);
+      color: var(--text);
+      padding: 4px 8px;
+      border-radius: 6px;
+      font-size: 12px;
+    }
+
+    .btn {
+      background: var(--accent2);
+      color: #fff;
+      border: none;
+      padding: 6px 14px;
+      border-radius: 7px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 600;
+      transition: opacity .15s;
+      white-space: nowrap;
+    }
+    .btn:hover { opacity: .85; }
+    .btn-sm { padding: 4px 10px; font-size: 11px; }
+    .btn-ghost {
+      background: transparent;
+      border: 1px solid var(--border2);
+      color: var(--dim);
+    }
+    .btn-ghost:hover { border-color: var(--accent); color: var(--accent); background: transparent; }
+
+    /* ── Alert banner ──────────────────────────────────────────────────── */
+    #alert-banner {
+      margin: 16px 0 0;
+      padding: 11px 18px;
+      border-radius: 9px;
+      font-size: 13px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      transition: background .3s, border-color .3s;
+    }
+    #alert-banner.nominal {
+      background: rgba(63,185,80,.07);
+      color: var(--green);
+      border: 1px solid rgba(63,185,80,.25);
+    }
+    #alert-banner.yellow {
+      background: rgba(227,165,37,.09);
+      color: var(--yellow);
+      border: 1px solid rgba(227,165,37,.35);
+    }
+    #alert-banner.red {
+      background: rgba(248,81,73,.09);
+      color: var(--red);
+      border: 1px solid rgba(248,81,73,.35);
+    }
+    .banner-icon { font-size: 15px; flex-shrink: 0; }
+    .banner-right { margin-left: auto; font-size: 11px; opacity: .75; }
+
+    /* ── Metric cards grid ─────────────────────────────────────────────── */
+    .cards-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(195px, 1fr));
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px 18px 14px;
+      position: relative;
+      overflow: hidden;
+      transition: border-color .3s;
+    }
+    .card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: var(--card-accent, var(--border));
+      border-radius: 12px 12px 0 0;
+      transition: background .3s;
+    }
+    .card-blue   { --card-accent: var(--accent); }
+    .card-green  { --card-accent: var(--green); }
+    .card-orange { --card-accent: var(--orange); }
+    .card-purple { --card-accent: var(--purple); }
+    .card-teal   { --card-accent: var(--teal); }
+    .card-dim    { --card-accent: var(--dim2); }
+
+    .card.alert-red    { border-color: rgba(248,81,73,.5); --card-accent: var(--red); }
+    .card.alert-yellow { border-color: rgba(227,165,37,.5); --card-accent: var(--yellow); }
+
+    .card-top { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 8px; }
+    .card-label {
+      font-size: 10px;
+      color: var(--dim);
+      text-transform: uppercase;
+      letter-spacing: .8px;
+      font-weight: 600;
+    }
+    .card-icon { font-size: 16px; opacity: .7; }
+
+    .card-value {
+      font-size: 30px;
+      font-weight: 700;
+      line-height: 1;
+      letter-spacing: -.5px;
+      font-variant-numeric: tabular-nums;
+    }
+    .card-unit { font-size: 11px; color: var(--dim); margin-top: 5px; }
+
+    /* Progress bar for SSR */
+    .card-bar {
+      margin-top: 10px;
+      height: 3px;
+      background: var(--border);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .card-bar-fill {
+      height: 100%;
+      border-radius: 3px;
+      background: var(--bar-color, var(--accent));
+      transition: width .5s ease;
+    }
+    .bar-label { font-size: 10px; color: var(--dim); margin-top: 4px; }
+
+    /* Sparkline in battery voltage card */
+    .card-sparkline {
+      margin-top: 10px;
+      height: 36px;
+    }
+    .card-sparkline svg { display: block; }
+
+    /* ── Section heading ────────────────────────────────────────────────── */
+    .section-head {
+      display: flex; align-items: center; justify-content: space-between;
+      margin: 20px 0 10px;
+      flex-wrap: wrap; gap: 8px;
+    }
+    .section-head h2 { font-size: 13px; font-weight: 600; color: var(--dim); text-transform: uppercase; letter-spacing: .7px; }
+
+    /* ── Tabs ──────────────────────────────────────────────────────────── */
+    .tabs {
+      display: flex; gap: 2px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 16px;
+    }
+    .tab-btn {
+      padding: 10px 18px;
+      background: none;
+      border: none;
+      color: var(--dim);
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+      display: flex; align-items: center; gap: 6px;
+      transition: color .15s;
+    }
+    .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+    .tab-btn:hover:not(.active) { color: var(--text); }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    .tab-badge {
+      display: inline-flex; align-items: center; justify-content: center;
+      min-width: 18px; height: 18px;
+      padding: 0 5px;
+      border-radius: 9px;
+      font-size: 10px; font-weight: 700;
+      background: var(--red);
+      color: #fff;
+    }
+    .tab-badge.yellow { background: var(--yellow); color: #000; }
+    .tab-badge.hidden { display: none; }
+
+    /* ── History controls ──────────────────────────────────────────────── */
+    .history-controls {
+      display: flex; gap: 8px; align-items: center;
+      flex-wrap: wrap; margin-bottom: 14px;
+      padding: 12px 14px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 9px;
+    }
+    .history-controls label { color: var(--dim); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .5px; }
+    .history-controls input {
+      background: var(--panel);
+      border: 1px solid var(--border2);
+      color: var(--text);
+      padding: 5px 8px;
+      border-radius: 6px;
+      font-size: 12px;
+      width: 130px;
+      font-variant-numeric: tabular-nums;
+    }
+    .history-presets { display: flex; gap: 4px; }
+    .preset-btn {
+      padding: 4px 9px;
+      border-radius: 5px;
+      border: 1px solid var(--border2);
+      background: transparent;
+      color: var(--dim);
+      font-size: 11px;
+      cursor: pointer;
+      transition: all .15s;
+    }
+    .preset-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .preset-btn.active { background: var(--accent2); border-color: var(--accent); color: #fff; }
+
+    /* ── Table ─────────────────────────────────────────────────────────── */
+    .table-wrap {
+      overflow-x: auto;
+      border-radius: 9px;
+      border: 1px solid var(--border);
+    }
+    table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+    thead th {
+      background: var(--panel);
+      color: var(--dim);
+      text-align: left;
+      padding: 10px 14px;
+      font-weight: 600;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: .6px;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+    tbody tr { border-bottom: 1px solid var(--border); transition: background .1s; }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: var(--card2); }
+    tbody td { padding: 8px 14px; font-variant-numeric: tabular-nums; }
+    .td-alert-red    { color: var(--red);    font-weight: 600; }
+    .td-alert-yellow { color: var(--yellow); font-weight: 600; }
+    .td-normal       { color: var(--green); }
+
+    /* ── Alert list ────────────────────────────────────────────────────── */
+    .alert-list { display: flex; flex-direction: column; gap: 8px; }
+    .alert-item {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      padding: 13px 16px;
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      transition: border-color .2s;
+    }
+    .alert-item.level-red    { border-left: 3px solid var(--red);    border-color: rgba(248,81,73,.3); }
+    .alert-item.level-yellow { border-left: 3px solid var(--yellow); border-color: rgba(227,165,37,.3); }
+    .alert-badge {
+      padding: 3px 9px;
+      border-radius: 5px;
+      font-size: 10px;
+      font-weight: 700;
+      flex-shrink: 0;
+      letter-spacing: .5px;
+    }
+    .badge-red    { background: rgba(248,81,73,.15);  color: var(--red);    border: 1px solid rgba(248,81,73,.4); }
+    .badge-yellow { background: rgba(227,165,37,.12); color: var(--yellow); border: 1px solid rgba(227,165,37,.4); }
+    .alert-body { flex: 1; min-width: 0; }
+    .alert-message { font-size: 13px; font-weight: 500; }
+    .alert-meta { font-size: 11px; color: var(--dim); margin-top: 3px; display: flex; gap: 10px; flex-wrap: wrap; }
+    .alert-field { font-family: monospace; background: var(--panel); padding: 1px 5px; border-radius: 3px; font-size: 10px; color: var(--dim); }
+
+    /* ── Stats grid ────────────────────────────────────────────────────── */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+      gap: 12px;
+    }
+    .stat-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+    }
+    .stat-label { font-size: 10px; color: var(--dim); text-transform: uppercase; letter-spacing: .6px; font-weight: 600; }
+    .stat-value { font-size: 26px; font-weight: 700; margin-top: 6px; letter-spacing: -.4px; font-variant-numeric: tabular-nums; }
+    .stat-unit  { font-size: 11px; color: var(--dim); margin-top: 3px; }
+    .stat-sub   { font-size: 11px; color: var(--dim); margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--border); }
+
+    /* ── Status bar ────────────────────────────────────────────────────── */
+    .status-bar {
+      margin-top: 24px;
+      padding: 10px 0;
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .status-left { display: flex; align-items: center; gap: 10px; }
+    .status-dot {
+      width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
+      background: var(--green);
+      transition: background .3s;
+    }
+    .status-dot.error { background: var(--red); animation: none; }
+    #status-msg { font-size: 11px; color: var(--dim); font-variant-numeric: tabular-nums; }
+    .status-bar a { color: var(--accent); text-decoration: none; font-size: 11px; }
+    .status-bar a:hover { text-decoration: underline; }
+    .status-links { display: flex; align-items: center; gap: 12px; }
+
+    /* ── Empty states ──────────────────────────────────────────────────── */
+    .empty {
+      text-align: center;
+      color: var(--dim);
+      padding: 40px 20px;
+      font-size: 13px;
+    }
+    .empty-icon { font-size: 32px; margin-bottom: 10px; opacity: .5; }
+
+    /* ── Colour helpers ────────────────────────────────────────────────── */
+    .c-accent  { color: var(--accent); }
+    .c-green   { color: var(--green); }
+    .c-yellow  { color: var(--yellow); }
+    .c-red     { color: var(--red); }
+    .c-orange  { color: var(--orange); }
+    .c-purple  { color: var(--purple); }
+    .c-teal    { color: var(--teal); }
+    .c-dim     { color: var(--dim); }
+
+    /* ── Loading skeleton ──────────────────────────────────────────────── */
+    @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+    .skeleton {
+      background: linear-gradient(90deg, var(--card) 25%, var(--card2) 50%, var(--card) 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.5s infinite;
+      border-radius: 4px;
+      color: transparent !important;
+    }
+
+    /* ── Responsive ────────────────────────────────────────────────────── */
+    @media (max-width: 600px) {
+      .cards-grid { grid-template-columns: repeat(2, 1fr); }
+      .card-value  { font-size: 24px; }
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <!-- ── Top bar ──────────────────────────────────────────────────────── -->
+  <header class="topbar">
+    <div class="logo">
+      <div class="logo-icon">🛰️</div>
+      <div class="logo-text">
+        <h1>Satellite Telemetry Monitor</h1>
+        <p>Real-time ground station dashboard</p>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <div class="sat-selector">
+        <label>Satellite&nbsp;</label>
+        <div class="sat-pills" id="sat-pills">
+          <button class="sat-pill active" data-id="1" onclick="selectSat(1, this)">SAT-1</button>
+          <button class="sat-pill"        data-id="2" onclick="selectSat(2, this)">SAT-2</button>
+          <button class="sat-pill"        data-id="3" onclick="selectSat(3, this)">SAT-3</button>
+        </div>
+        <div class="sat-custom">
+          <input id="sat-custom" type="number" min="1" placeholder="ID" title="Custom satellite ID" />
+          <button class="btn btn-sm btn-ghost" onclick="selectCustomSat()">Go</button>
+        </div>
+      </div>
+      <a href="/globe" class="btn btn-ghost btn-sm" style="text-decoration:none;display:inline-flex;align-items:center;gap:5px;" title="Open 3D Globe View">
+        🌍 Globe View
+      </a>
+      <div id="db-badge" class="db-badge" title="MongoDB Atlas connection status">
+        <div class="db-dot"></div>
+        <span id="db-status-text">MONGO</span>
+      </div>
+      <div class="live-badge">
+        <div class="live-dot"></div>
+        LIVE
+      </div>
+    </div>
+  </header>
+
+  <!-- ── Alert banner ────────────────────────────────────────────────── -->
+  <div id="alert-banner" class="nominal">
+    <span class="banner-icon">✅</span>
+    <span id="banner-text">STATUS: NOMINAL — all systems operational</span>
+    <span class="banner-right" id="banner-count"></span>
+  </div>
+
+  <!-- ── Live metric cards ──────────────────────────────────────────── -->
+  <div class="section-head" style="margin-top:20px;">
+    <h2>Live Telemetry</h2>
+    <span id="last-updated" style="font-size:11px;color:var(--dim)">—</span>
+  </div>
+  <div class="cards-grid">
+
+    <!-- Battery Voltage -->
+    <div class="card card-blue" id="card-batt-voltage" style="grid-column: span 2;">
+      <div class="card-top">
+        <div class="card-label">Battery Voltage</div>
+        <span class="card-icon">⚡</span>
+      </div>
+      <div class="card-value c-accent" id="val-battery-voltage">—</div>
+      <div class="card-unit">millivolts (mV)</div>
+      <div class="card-sparkline" id="sparkline-container">
+        <svg id="sparkline-svg" width="100%" height="36" viewBox="0 0 200 36" preserveAspectRatio="none"></svg>
+      </div>
+    </div>
+
+    <!-- MSI Temperature -->
+    <div class="card card-orange" id="card-msi-temp">
+      <div class="card-top">
+        <div class="card-label">MSI Temperature</div>
+        <span class="card-icon">🌡️</span>
+      </div>
+      <div class="card-value c-orange" id="val-msi-temperature">—</div>
+      <div class="card-unit">degrees Celsius (°C)</div>
+      <div class="card-bar" style="margin-top:10px">
+        <div class="card-bar-fill" id="bar-msi" style="--bar-color:var(--orange); width:0%"></div>
+      </div>
+      <div class="bar-label" id="bar-msi-label">threshold: 40 °C</div>
+    </div>
+
+    <!-- Battery Temp -->
+    <div class="card card-teal">
+      <div class="card-top">
+        <div class="card-label">Battery Temp</div>
+        <span class="card-icon">🔋</span>
+      </div>
+      <div class="card-value c-teal" id="val-battery-temp">—</div>
+      <div class="card-unit">degrees Celsius (°C)</div>
+    </div>
+
+    <!-- SSR Used -->
+    <div class="card card-purple">
+      <div class="card-top">
+        <div class="card-label">SSR Storage Used</div>
+        <span class="card-icon">💾</span>
+      </div>
+      <div class="card-value c-purple" id="val-ssr-used">—</div>
+      <div class="card-unit">megabytes (MB)</div>
+      <div class="card-bar" style="margin-top:10px">
+        <div class="card-bar-fill" id="bar-ssr" style="--bar-color:var(--purple); width:0%"></div>
+      </div>
+      <div class="bar-label" id="bar-ssr-label">of 8 192 MB capacity</div>
+    </div>
+
+    <!-- Satellite ID -->
+    <div class="card card-dim">
+      <div class="card-top">
+        <div class="card-label">Satellite</div>
+        <span class="card-icon">🛰️</span>
+      </div>
+      <div class="card-value c-accent" id="val-satellite-id">—</div>
+      <div class="card-unit">satellite ID</div>
+    </div>
+
+    <!-- Last Packet -->
+    <div class="card card-dim">
+      <div class="card-top">
+        <div class="card-label">Last Packet</div>
+        <span class="card-icon">🕐</span>
+      </div>
+      <div id="val-timestamp" style="font-size:12px;line-height:1.6;color:var(--text);font-variant-numeric:tabular-nums;">—</div>
+      <div class="card-unit" id="val-ts-ago">&nbsp;</div>
+    </div>
+
+  </div>
+
+  <!-- ── Tabs ────────────────────────────────────────────────────────── -->
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('history', this)">
+      History
+    </button>
+    <button class="tab-btn" onclick="switchTab('alerts', this)">
+      Alerts
+      <span id="alert-tab-badge" class="tab-badge hidden">0</span>
+    </button>
+    <button class="tab-btn" onclick="switchTab('stats', this)">
+      Statistics
+    </button>
+  </div>
+
+  <!-- ── History tab ─────────────────────────────────────────────────── -->
+  <div id="tab-history" class="tab-panel active">
+    <div class="history-controls">
+      <label>Range</label>
+      <div class="history-presets">
+        <button class="preset-btn"        data-hours="1"  onclick="setPreset(this,1)">1h</button>
+        <button class="preset-btn"        data-hours="6"  onclick="setPreset(this,6)">6h</button>
+        <button class="preset-btn"        data-hours="12" onclick="setPreset(this,12)">12h</button>
+        <button class="preset-btn active" data-hours="24" onclick="setPreset(this,24)">24h</button>
+      </div>
+      <label style="margin-left:8px">From</label>
+      <input id="from-ts" type="number" />
+      <label>To</label>
+      <input id="to-ts" type="number" />
+      <button class="btn btn-sm" onclick="fetchHistory()">Fetch</button>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Timestamp (UTC)</th>
+            <th>Sat</th>
+            <th>Battery Voltage (mV)</th>
+            <th>Battery Temp (°C)</th>
+            <th>MSI Temp (°C)</th>
+            <th>SSR Used (MB)</th>
+          </tr>
+        </thead>
+        <tbody id="history-tbody">
+          <tr><td colspan="6" class="empty"><div class="empty-icon">📡</div>Loading history…</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div id="history-footer" style="font-size:11px;color:var(--dim);margin-top:8px;text-align:right;"></div>
+  </div>
+
+  <!-- ── Alerts tab ──────────────────────────────────────────────────── -->
+  <div id="tab-alerts" class="tab-panel">
+    <div id="alert-list" class="alert-list">
+      <div class="empty"><div class="empty-icon">✅</div>No active alerts.</div>
+    </div>
+  </div>
+
+  <!-- ── Statistics tab ─────────────────────────────────────────────── -->
+  <div id="tab-stats" class="tab-panel">
+    <div id="stats-container" class="stats-grid">
+      <div class="empty" style="grid-column:1/-1">
+        <div class="empty-icon">📊</div>Loading statistics…
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Status bar ──────────────────────────────────────────────────── -->
+  <div class="status-bar">
+    <div class="status-left">
+      <div class="status-dot" id="status-dot"></div>
+      <span id="status-msg">Connecting…</span>
+    </div>
+    <div class="status-links">
+      <a href="/docs"  target="_blank">Swagger UI</a>
+      <a href="/redoc" target="_blank">ReDoc</a>
+    </div>
+  </div>
+
+</div><!-- /container -->
+
+<script>
+/* ── Config ──────────────────────────────────────────────────────────── */
+const API   = '';
+const POLL  = 3000;         // auto-refresh interval ms
+const MAX_SPARKLINE = 20;   // max points in voltage sparkline
+const SSR_MAX = 8192;       // MB
+const MSI_WARN_TEMP = 40;   // °C — RED threshold
+
+let autoRefreshTimer = null;
+let currentSatId     = 1;
+let voltageHistory   = [];  // last N battery_voltage readings for sparkline
+let prevTimestamp    = null;
+
+/* ── Satellite selector ─────────────────────────────────────────────── */
+function selectSat(id, btn) {
+  currentSatId   = id;
+  historyLoaded  = false;
+  statsLoaded    = false;
+  voltageHistory = [];
+  document.querySelectorAll('.sat-pill').forEach(p => p.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  refresh();
+  updateHistoryRange();
+  fetchHistory();
+  fetchStats();
+}
+
+function selectCustomSat() {
+  const v = parseInt(document.getElementById('sat-custom').value);
+  if (!v || v < 1) return;
+  currentSatId   = v;
+  historyLoaded  = false;
+  statsLoaded    = false;
+  voltageHistory = [];
+  document.querySelectorAll('.sat-pill').forEach(p => p.classList.remove('active'));
+  refresh();
+  updateHistoryRange();
+  fetchHistory();
+  fetchStats();
+}
+
+/* ── Preset time ranges ─────────────────────────────────────────────── */
+function setPreset(btn, hours) {
+  document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const now = Math.floor(Date.now() / 1000);
+  document.getElementById('to-ts').value   = now;
+  document.getElementById('from-ts').value = now - hours * 3600;
+  fetchHistory();
+}
+
+/* ── Helpers ─────────────────────────────────────────────────────────── */
+function fmtTs(ts) {
+  if (!ts) return '—';
+  return new Date(ts * 1000).toLocaleString(undefined, {
+    month:'short', day:'numeric', hour:'2-digit', minute:'2-digit', second:'2-digit'
+  });
+}
+
+function timeAgo(ts) {
+  if (!ts) return '';
+  const secs = Math.floor(Date.now() / 1000) - ts;
+  if (secs < 5)   return 'just now';
+  if (secs < 60)  return `${secs}s ago`;
+  if (secs < 3600) return `${Math.floor(secs/60)}m ago`;
+  return `${Math.floor(secs/3600)}h ago`;
+}
+
+function fmt(v, dec=1) {
+  if (v === undefined || v === null) return '—';
+  return Number.isInteger(v) ? v.toString() : v.toFixed(dec);
+}
+
+function setText(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = (val === undefined || val === null) ? '—' : String(val);
+}
+
+function setStatus(msg, ok=true) {
+  document.getElementById('status-msg').textContent = msg;
+  const dot = document.getElementById('status-dot');
+  dot.className = 'status-dot' + (ok ? '' : ' error');
+}
+
+/* ── Sparkline SVG ───────────────────────────────────────────────────── */
+function renderSparkline(values) {
+  const svg = document.getElementById('sparkline-svg');
+  if (!svg || values.length < 2) { svg && (svg.innerHTML = ''); return; }
+
+  const W = 200, H = 36;
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min || 1;
+  const pad = 2;
+
+  // Build polyline points
+  const pts = values.map((v, i) => {
+    const x = pad + (i / (values.length - 1)) * (W - pad * 2);
+    const y = H - pad - ((v - min) / range) * (H - pad * 2);
+    return [x, y];
+  });
+
+  const polyline = pts.map(p => p.join(',')).join(' ');
+
+  // Build gradient fill area
+  const first = pts[0], last = pts[pts.length - 1];
+  const fillPath = `M${first[0]},${H} ` +
+    pts.map(p => `L${p[0]},${p[1]}`).join(' ') +
+    ` L${last[0]},${H} Z`;
+
+  // Is latest value in alert zone?
+  const latestV = values[values.length - 1];
+  const isAlert = latestV < 12000;
+  const lineColor  = isAlert ? '#e3a525' : '#4d9ef5';
+  const fillColor1 = isAlert ? 'rgba(227,165,37,0.25)' : 'rgba(77,158,245,0.25)';
+  const fillColor2 = isAlert ? 'rgba(227,165,37,0)'   : 'rgba(77,158,245,0)';
+
+  svg.innerHTML = `
+    <defs>
+      <linearGradient id="sg" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%"   stop-color="${fillColor1}"/>
+        <stop offset="100%" stop-color="${fillColor2}"/>
+      </linearGradient>
+    </defs>
+    <path d="${fillPath}" fill="url(#sg)" />
+    <polyline points="${polyline}" fill="none" stroke="${lineColor}" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+    <circle cx="${last[0]}" cy="${last[1]}" r="2.5" fill="${lineColor}"/>
+  `;
+}
+
+/* ── Alert banner ────────────────────────────────────────────────────── */
+function updateBanner(alerts) {
+  const banner = document.getElementById('alert-banner');
+  const text   = document.getElementById('banner-text');
+  const count  = document.getElementById('banner-count');
+  const levels = alerts.map(a => a.level);
+  const redCnt = levels.filter(l => l === 'RED').length;
+  const yelCnt = levels.filter(l => l === 'YELLOW').length;
+
+  banner.className = '';
+  if (levels.includes('RED')) {
+    banner.classList.add('red');
+    text.innerHTML = `<strong>RED ALERT</strong> — MSI temperature threshold exceeded`;
+    document.getElementById('alert-banner').querySelector('.banner-icon').textContent = '🚨';
+  } else if (levels.includes('YELLOW')) {
+    banner.classList.add('yellow');
+    text.innerHTML = `<strong>YELLOW WARNING</strong> — Battery voltage below threshold`;
+    document.getElementById('alert-banner').querySelector('.banner-icon').textContent = '⚠️';
+  } else {
+    banner.classList.add('nominal');
+    text.innerHTML = `<strong>NOMINAL</strong> — All systems operating within parameters`;
+    document.getElementById('alert-banner').querySelector('.banner-icon').textContent = '✅';
+  }
+
+  count.textContent = alerts.length > 0 ? `${alerts.length} active alert${alerts.length>1?'s':''}` : '';
+
+  // Tab badge
+  const badge = document.getElementById('alert-tab-badge');
+  if (alerts.length > 0) {
+    badge.textContent = alerts.length;
+    badge.className   = 'tab-badge' + (levels.includes('RED') ? '' : ' yellow');
+  } else {
+    badge.className = 'tab-badge hidden';
+  }
+}
+
+/* ── Metric cards ────────────────────────────────────────────────────── */
+function updateCards(d) {
+  if (!d) {
+    ['battery-voltage','battery-temp','msi-temperature','ssr-used','satellite-id'].forEach(k => {
+      const el = document.getElementById('val-' + k);
+      if (el) el.textContent = '—';
+    });
+    document.getElementById('val-timestamp').textContent = '—';
+    document.getElementById('val-ts-ago').textContent = '';
+    return;
+  }
+
+  setText('val-battery-voltage', d.battery_voltage ? d.battery_voltage.toLocaleString() : '—');
+  setText('val-battery-temp',    d.battery_temp);
+  setText('val-msi-temperature', d.msi_temperature);
+  setText('val-ssr-used',        d.ssr_used ? d.ssr_used.toLocaleString() : '—');
+  setText('val-satellite-id',    d.satellite_id);
+
+  const ts = d.timestamp;
+  document.getElementById('val-timestamp').textContent = fmtTs(ts);
+  document.getElementById('val-ts-ago').textContent    = timeAgo(ts);
+
+  // Sparkline — track voltage history
+  if (d.battery_voltage && (prevTimestamp === null || ts !== prevTimestamp)) {
+    prevTimestamp = ts;
+    voltageHistory.push(d.battery_voltage);
+    if (voltageHistory.length > MAX_SPARKLINE) voltageHistory.shift();
+    renderSparkline(voltageHistory);
+  }
+
+  // Alert colouring
+  const vCard = document.getElementById('card-batt-voltage');
+  const mCard = document.getElementById('card-msi-temp');
+  vCard.className = 'card card-blue' + (d.battery_voltage < 12000 ? ' alert-yellow' : '');
+  mCard.className = 'card card-orange' + (d.msi_temperature > MSI_WARN_TEMP ? ' alert-red' : '');
+
+  // MSI temp bar (0-80°C range, warn at 40)
+  const msiPct = Math.min(100, (d.msi_temperature / 80) * 100);
+  document.getElementById('bar-msi').style.width = msiPct + '%';
+  document.getElementById('bar-msi').style.setProperty('--bar-color',
+    d.msi_temperature > MSI_WARN_TEMP ? 'var(--red)' : 'var(--orange)');
+  document.getElementById('bar-msi-label').textContent =
+    `${d.msi_temperature}°C  ·  threshold: 40°C`;
+
+  // SSR bar
+  const ssrPct = Math.min(100, (d.ssr_used / SSR_MAX) * 100);
+  document.getElementById('bar-ssr').style.width = ssrPct + '%';
+  document.getElementById('bar-ssr-label').textContent =
+    `${ssrPct.toFixed(1)}% of ${SSR_MAX.toLocaleString()} MB`;
+}
+
+/* ── Alert list panel ────────────────────────────────────────────────── */
+function updateAlertPanel(alerts) {
+  const container = document.getElementById('alert-list');
+  if (!alerts.length) {
+    container.innerHTML = '<div class="empty"><div class="empty-icon">✅</div>No active alerts — all systems nominal.</div>';
+    return;
+  }
+  container.innerHTML = alerts.map(a => `
+    <div class="alert-item level-${a.level.toLowerCase()}">
+      <span class="alert-badge ${a.level === 'RED' ? 'badge-red' : 'badge-yellow'}">${a.level}</span>
+      <div class="alert-body">
+        <div class="alert-message">${a.message}</div>
+        <div class="alert-meta">
+          <span><code class="alert-field">${a.field}</code> = ${a.value}</span>
+          <span>${fmtTs(a.timestamp)}</span>
+          <span>Satellite ${a.satellite_id}</span>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+/* ── History table ───────────────────────────────────────────────────── */
+async function fetchHistory() {
+  const from  = document.getElementById('from-ts').value;
+  const to    = document.getElementById('to-ts').value;
+  const tbody = document.getElementById('history-tbody');
+  tbody.innerHTML = '<tr><td colspan="6" class="empty">Loading…</td></tr>';
+
+  try {
+    const r = await fetch(`${API}/telemetry/history?satellite_id=${currentSatId}&from=${from}&to=${to}`);
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const data = await r.json();
+
+    if (!data.records.length) {
+      tbody.innerHTML = '<tr><td colspan="6" class="empty"><div class="empty-icon">📭</div>No records in this time range.</td></tr>';
+      document.getElementById('history-footer').textContent = '';
+      return;
+    }
+
+    // Show newest first
+    const rows = [...data.records].reverse();
+    tbody.innerHTML = rows.map(rec => {
+      const bvClass = rec.battery_voltage < 12000  ? 'td-alert-yellow' : 'td-normal';
+      const mtClass = rec.msi_temperature > MSI_WARN_TEMP ? 'td-alert-red' : '';
+      return `
+        <tr>
+          <td>${fmtTs(rec.timestamp)}</td>
+          <td>${rec.satellite_id}</td>
+          <td class="${bvClass}">${rec.battery_voltage.toLocaleString()}</td>
+          <td>${rec.battery_temp}</td>
+          <td class="${mtClass}">${rec.msi_temperature}</td>
+          <td>${rec.ssr_used.toLocaleString()}</td>
+        </tr>
+      `;
+    }).join('');
+
+    document.getElementById('history-footer').textContent =
+      `${data.count} record${data.count!==1?'s':''} — sorted newest first`;
+    setStatus(`History: ${data.count} records · Satellite ${currentSatId}`);
+    historyLoaded = true;
+  } catch (e) {
+    tbody.innerHTML = `<tr><td colspan="6" class="empty">Error loading history — is main.py running?<br><small style="color:var(--dim)">${e.message}</small></td></tr>`;
+    setStatus('History error: ' + e.message, false);
+    historyLoaded = false;
+  }
+}
+
+/* ── Statistics panel ────────────────────────────────────────────────── */
+async function fetchStats() {
+  const container = document.getElementById('stats-container');
+  container.innerHTML = '<div class="empty" style="grid-column:1/-1">Loading…</div>';
+
+  try {
+    const r = await fetch(`${API}/stats/satellite/${currentSatId}`);
+    if (!r.ok) throw new Error(`HTTP ${r.status} — no data for satellite ${currentSatId}`);
+    const d = await r.json();
+
+    container.innerHTML = `
+      <div class="stat-card">
+        <div class="stat-label">Total Packets</div>
+        <div class="stat-value c-accent">${d.total_packets.toLocaleString()}</div>
+        <div class="stat-unit">telemetry frames received</div>
+        <div class="stat-sub">${fmtTs(d.first_packet_ts)} → ${fmtTs(d.last_packet_ts)}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Avg Battery Voltage</div>
+        <div class="stat-value ${d.avg_battery_voltage_mv < 12000 ? 'c-yellow' : 'c-green'}">${fmt(d.avg_battery_voltage_mv, 0)}</div>
+        <div class="stat-unit">mV  (nominal ≥ 12 000 mV)</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Min Battery Voltage</div>
+        <div class="stat-value ${d.min_battery_voltage_mv < 12000 ? 'c-yellow' : ''}">${fmt(d.min_battery_voltage_mv, 0)}</div>
+        <div class="stat-unit">mV — lowest recorded</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Max Battery Voltage</div>
+        <div class="stat-value c-green">${fmt(d.max_battery_voltage_mv, 0)}</div>
+        <div class="stat-unit">mV — highest recorded</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Avg MSI Temperature</div>
+        <div class="stat-value c-orange">${fmt(d.avg_msi_temperature_c)}</div>
+        <div class="stat-unit">°C  (alert threshold: 40 °C)</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Max MSI Temperature</div>
+        <div class="stat-value ${d.max_msi_temperature_c > MSI_WARN_TEMP ? 'c-red' : 'c-orange'}">${fmt(d.max_msi_temperature_c)}</div>
+        <div class="stat-unit">°C — peak recorded</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Avg Battery Temp</div>
+        <div class="stat-value c-teal">${fmt(d.avg_battery_temp_c)}</div>
+        <div class="stat-unit">°C</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Max SSR Used</div>
+        <div class="stat-value c-purple">${fmt(d.max_ssr_used_mb, 0)}</div>
+        <div class="stat-unit">MB of ${SSR_MAX.toLocaleString()} MB capacity</div>
+        <div class="stat-sub">${((d.max_ssr_used_mb / SSR_MAX) * 100).toFixed(1)}% peak utilisation</div>
+      </div>
+    `;
+    setStatus(`Statistics loaded · Satellite ${currentSatId}`);
+    statsLoaded = true;
+  } catch (e) {
+    container.innerHTML = '<div class="empty" style="grid-column:1/-1">No statistics available — no data for this satellite yet.</div>';
+    setStatus('Stats: ' + e.message, false);
+    statsLoaded = false;
+  }
+}
+
+/* ── Tab switching ───────────────────────────────────────────────────── */
+function switchTab(name, btn) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  btn.classList.add('active');
+  activeTab = name;
+
+  // Auto-load data when switching to these tabs
+  if (name === 'stats')   fetchStats();
+  if (name === 'history') { updateHistoryRange(); fetchHistory(); }
+}
+
+/* ── Active tab tracker ──────────────────────────────────────────────── */
+let activeTab        = 'history';
+let refreshTick      = 0;
+let historyLoaded    = false;
+let statsLoaded      = false;
+
+/* ── Main refresh ────────────────────────────────────────────────────── */
+async function refresh() {
+  try {
+    const [rTelem, rAlerts] = await Promise.all([
+      fetch(`${API}/telemetry/latest?satellite_id=${currentSatId}`),
+      fetch(`${API}/alerts?satellite_id=${currentSatId}`),
+    ]);
+
+    const telem  = rTelem.ok  ? await rTelem.json()  : null;
+    const aData  = rAlerts.ok ? await rAlerts.json() : { alerts: [] };
+    const alerts = aData.alerts || [];
+
+    updateCards(telem);
+    updateBanner(alerts);
+    updateAlertPanel(alerts);
+
+    const now = new Date().toLocaleTimeString();
+    document.getElementById('last-updated').textContent = `Last updated: ${now}`;
+
+    if (telem) {
+      setStatus(`Connected  ·  Satellite ${currentSatId}  ·  Auto-refresh every 3 s`);
+    } else {
+      setStatus(`Connected — no data yet for Satellite ${currentSatId}  ·  Auto-refresh every 3 s`);
+    }
+
+    // Retry history/stats if they haven't loaded yet or every 10th tick
+    refreshTick++;
+    if (activeTab === 'history' && (!historyLoaded || refreshTick % 10 === 0)) {
+      updateHistoryRange();
+      fetchHistory();
+    }
+    if (activeTab === 'stats' && (!statsLoaded || refreshTick % 10 === 0)) {
+      fetchStats();
+    }
+  } catch (e) {
+    setStatus('API not reachable — start the server:  python main.py', false);
+    document.getElementById('last-updated').textContent = 'Connection error';
+  }
+}
+
+/* ── Auto-refresh ────────────────────────────────────────────────────── */
+function startAutoRefresh() {
+  if (autoRefreshTimer) clearInterval(autoRefreshTimer);
+  autoRefreshTimer = setInterval(refresh, POLL);
+}
+
+/* ── Update history range to current time window ─────────────────────── */
+function updateHistoryRange() {
+  const now = Math.floor(Date.now() / 1000);
+  // Find which preset is active and use that window
+  const activePreset = document.querySelector('.preset-btn.active');
+  const hours = activePreset ? parseInt(activePreset.dataset.hours) : 24;
+  document.getElementById('to-ts').value   = now;
+  document.getElementById('from-ts').value = now - hours * 3600;
+}
+
+/* ── MongoDB health badge ─────────────────────────────────────────────── */
+async function checkDbHealth() {
+  const badge = document.getElementById('db-badge');
+  const text  = document.getElementById('db-status-text');
+  try {
+    const r = await fetch('/health/db');
+    const d = await r.json();
+    if (d.status === 'connected') {
+      badge.className = 'db-badge connected';
+      text.textContent = `MONGO  ${d.latency_ms}ms`;
+      badge.title = `MongoDB Atlas — Connected\nLatency: ${d.latency_ms} ms\nTelemetry: ${d.telemetry_docs.toLocaleString()} docs\nAlerts: ${d.alert_docs.toLocaleString()} docs`;
+    } else {
+      badge.className = 'db-badge disconnected';
+      text.textContent = 'MONGO  ✕';
+      badge.title = `MongoDB Atlas — Disconnected\n${d.error || ''}`;
+    }
+  } catch (_) {
+    badge.className = 'db-badge disconnected';
+    text.textContent = 'MONGO  ✕';
+    badge.title = 'MongoDB Atlas — Unreachable';
+  }
+}
+
+/* ── Init ────────────────────────────────────────────────────────────── */
+window.addEventListener('load', () => {
+  // Default to last 24 hours (matches seed data window)
+  const now = Math.floor(Date.now() / 1000);
+  document.getElementById('to-ts').value   = now;
+  document.getElementById('from-ts').value = now - 24 * 3600;
+
+  refresh();
+  fetchHistory();
+  fetchStats();
+  startAutoRefresh();
+  checkDbHealth();
+  setInterval(checkDbHealth, 5000);
+});
+</script>
+</body>
+</html>

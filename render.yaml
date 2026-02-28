@@ -1,0 +1,25 @@
+# render.yaml — Render Blueprint
+#
+# One-click deploy: connect your GitHub repo on render.com, select this file,
+# and Render will automatically create the web service below.
+#
+# Required environment variable (add in Render dashboard → Environment):
+#   MONGODB_URI  —  your MongoDB Atlas connection string
+#
+# Note: The UDP telemetry listener (udp_service.py) is not started here because
+# Render's free tier does not expose raw UDP ports. The web dashboard, REST API,
+# and 3D globe all work fully over HTTPS.
+
+services:
+  - type: web
+    name: nastp-satellite-dashboard
+    env: python
+    region: oregon            # change to "frankfurt" or "singapore" if closer
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn api:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: MONGODB_URI
+        sync: false           # set manually in Render dashboard (keeps credentials out of git)
+      - key: PYTHON_VERSION
+        value: 3.11.0
