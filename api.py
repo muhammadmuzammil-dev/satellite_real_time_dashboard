@@ -3,7 +3,8 @@ api.py — FastAPI REST API
 
 Endpoints
 ─────────
-  GET /                                  → Serves the web dashboard
+  GET /                                  → Serves the 3D globe view
+  GET /dashboard                         → Serves the web dashboard
   GET /telemetry/latest?satellite_id=ID  → Latest HK record for a satellite
   GET /telemetry/history?satellite_id=ID&from=TS&to=TS
                                          → HK records within a time range
@@ -103,11 +104,11 @@ _STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
 
 
 @app.get("/", include_in_schema=False)
-def dashboard():
-    """Serve the web dashboard."""
-    html_path = os.path.join(_STATIC_DIR, "dashboard.html")
+def globe():
+    """Serve the 3D satellite globe view."""
+    html_path = os.path.join(_STATIC_DIR, "globe.html")
     if not os.path.exists(html_path):
-        raise HTTPException(status_code=404, detail="Dashboard not found")
+        raise HTTPException(status_code=404, detail="Globe not found")
     return FileResponse(html_path, media_type="text/html")
 
 
@@ -120,12 +121,12 @@ def db_health():
     return result
 
 
-@app.get("/globe", include_in_schema=False)
-def globe():
-    """Serve the 3D satellite globe view."""
-    html_path = os.path.join(_STATIC_DIR, "globe.html")
+@app.get("/dashboard", include_in_schema=False)
+def dashboard():
+    """Serve the web dashboard."""
+    html_path = os.path.join(_STATIC_DIR, "dashboard.html")
     if not os.path.exists(html_path):
-        raise HTTPException(status_code=404, detail="Globe not found")
+        raise HTTPException(status_code=404, detail="Dashboard not found")
     return FileResponse(html_path, media_type="text/html")
 
 
