@@ -1,9 +1,13 @@
-name: Deploy to GitHub
+name: CI / Deploy
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Triggers
-#   • Every push to main  → run tests, then deploy to self-hosted runner
+#   • Every push to main  → run tests (Leapcell auto-deploys from the push)
 #   • Every pull request  → run tests only
+#
+# Deployment is handled automatically by Leapcell.
+# Every push to main triggers a Leapcell build + deploy via its GitHub
+# integration.  globe.html is always served at your .leapcell.dev URL.
 # ──────────────────────────────────────────────────────────────────────────────
 on:
   push:
@@ -15,7 +19,7 @@ env:
   PYTHON_VERSION: "3.11"
 
 jobs:
-  # ── Lint + Test (GitHub-hosted cloud runner) ─────────────────────────────────
+  # ── Lint + Test ──────────────────────────────────────────────────────────────
   test:
     name: Lint & Test Suite
     runs-on: ubuntu-latest
@@ -40,38 +44,3 @@ jobs:
         env:
           MONGODB_URI: ${{ secrets.MONGODB_URI }}
         run: python test_all.py
-
-  # ── Deploy (self-hosted runner — your own machine / server) ──────────────────
-  # Runs only on pushes to main (not on pull requests).
-  # Starts python main.py in the background so it keeps running after this job
-  # finishes.  globe.html is always served at http://127.0.0.1:5000/
-  deploy:
-    name: Start / Restart Server
-    runs-on: self-hosted
-    needs: test
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Install dependencies
-        run: pip install -r requirements.txt
-
-      - name: Stop any existing main.py process
-        run: pkill -f "python main.py" || true
-
-      - name: Start python main.py (persists after this job)
-        env:
-          MONGODB_URI: ${{ secrets.MONGODB_URI }}
-        run: |
-          nohup python main.py > server.log 2>&1 &
-          echo $! > server.pid
-          echo "Started main.py with PID $(cat server.pid)"
-
-      - name: Verify globe.html is being served
-        run: |
-          sleep 4
-          curl --silent --fail http://127.0.0.1:5000/ > /dev/null \
-            && echo "globe.html is live at http://127.0.0.1:5000/" \
-            || (echo "Server failed to start — logs:" && cat server.log && exit 1)

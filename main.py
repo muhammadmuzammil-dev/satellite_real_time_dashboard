@@ -13,8 +13,6 @@ Swagger API docs are at           http://127.0.0.1:5000/docs
 import logging
 import signal
 import sys
-import webbrowser
-from threading import Timer
 
 import uvicorn
 
@@ -28,13 +26,6 @@ logging.basicConfig(
     datefmt="%H:%M:%S",
 )
 logger = logging.getLogger(__name__)
-
-
-def open_browser() -> None:
-    """Open the dashboard in the default browser after a short delay."""
-    url = f"http://127.0.0.1:{API_PORT}/"
-    logger.info("Opening dashboard: %s", url)
-    webbrowser.open(url)
 
 
 def main() -> None:
@@ -60,9 +51,6 @@ def main() -> None:
         sys.exit(0)
 
     signal.signal(signal.SIGINT, _shutdown)
-
-    # ── Auto-open browser (1 second after uvicorn is ready) ───────────────
-    Timer(1.0, open_browser).start()
 
     # ── FastAPI via uvicorn (blocking — runs on the main thread) ──────────
     # Import here to avoid circular imports at module level

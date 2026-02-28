@@ -6,8 +6,8 @@ UDP_HOST = "0.0.0.0"
 UDP_PORT = 5005
 
 API_HOST = "0.0.0.0"
-# Render (and most PaaS) inject PORT; fall back to 5000 for local dev
-API_PORT = int(os.getenv("PORT", 5000))
+# Leapcell (and most PaaS) inject PORT; fall back to 8080 for local dev
+API_PORT = int(os.getenv("PORT", 8080))
 
 # Set MONGODB_URI as an environment variable in production (Render / GitHub secret).
 # Falls back to the dev Atlas URI so local development keeps working without extra setup.
