@@ -20,6 +20,7 @@ import time
 import json
 import urllib.request
 import urllib.error
+import certifi
 
 # Force UTF-8 output on Windows so Unicode characters print correctly
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
@@ -291,7 +292,7 @@ def test_mongodb():
 
     # 4a. Atlas connection
     try:
-        client = MongoClient(MONGODB_URI, serverSelectionTimeoutMS=8000)
+        client = MongoClient(MONGODB_URI, serverSelectionTimeoutMS=8000, tlsCAFile=certifi.where())
         client.admin.command("ping")
         check("4a. MongoDB Atlas connection successful", True)
     except Exception as e:
@@ -390,7 +391,7 @@ def test_integration():
     # ── Pre-clean any leftover data from interrupted previous runs ─────────
     from pymongo import MongoClient
     from config import MONGODB_URI, DB_NAME, TELEMETRY_COLLECTION, ALERTS_COLLECTION
-    _pre_client = MongoClient(MONGODB_URI, serverSelectionTimeoutMS=8000)
+    _pre_client = MongoClient(MONGODB_URI, serverSelectionTimeoutMS=8000, tlsCAFile=certifi.where())
     _pre_client[DB_NAME][TELEMETRY_COLLECTION].delete_many({"satellite_id": SAT_ID})
     _pre_client[DB_NAME][ALERTS_COLLECTION].delete_many({"satellite_id": SAT_ID})
 
@@ -435,7 +436,7 @@ def test_integration():
     # 2b. Multiple packets processed (check DB count)
     from config import MONGODB_URI, DB_NAME, TELEMETRY_COLLECTION
     from pymongo import MongoClient
-    client = MongoClient(MONGODB_URI, serverSelectionTimeoutMS=8000)
+    client = MongoClient(MONGODB_URI, serverSelectionTimeoutMS=8000, tlsCAFile=certifi.where())
     count = client[DB_NAME][TELEMETRY_COLLECTION].count_documents({"satellite_id": SAT_ID})
     check("2b. All 5 UDP packets processed and stored in MongoDB",
           count == 5, f"found {count} records")
